@@ -19,12 +19,39 @@ class Router
     {
         return self::$route;
     }
+    protected static function removeQueryString($url)
+    {
+        if($url){
+            $params = explode('&', $url, 2);
+            if(false === str_contains($params[0], '=')){
+                return rtrim($params[0], '/');
+            }
+        }
+        return '';
+    }
     public static function dispatch($url)
     {
+        $url = self::removeQueryString($url);
         if(self::matchRoute($url)){
-            echo "OK";
+            $controller = 'app\controllers\\' . self::$route['admin_prefix'] . self::$route['controller'] . 'Controller';
+            if(class_exists($controller)){
+
+                /** @var Controller $controllerObject*/
+                $controllerObject = new $controller(self::$route);
+                $controllerObject->getModel();
+
+                $action = self::lowerCamelCase(self::$route['action'] . 'Action');
+                if(method_exists($controllerObject, $action)){
+                    $controllerObject->$action();
+                }else{
+                    throw new \Exception("Метод {$controller}::{$action} не найден", 404);
+                }
+
+            }else{
+                throw new \Exception("Контроллер {$controller} не найдена", 404);
+            }
         }else{
-            echo "NO";
+           throw new \Exception("Страница не найдена", 404);
         }
     }
     public static function matchRoute($url): bool
@@ -32,7 +59,6 @@ class Router
         foreach(self::$routes as $pattern => $route)
         {
             if(preg_match("#{$pattern}#", $url, $matches)){
-                debug($matches);
                 foreach ($matches as $k => $v){
                     if(is_string($k)){
                        $route[$k] = $v;
@@ -44,11 +70,11 @@ class Router
                 if(!isset($route['admin_prefix'])){
                     $route['admin_prefix'] = '';
                 }else{
-                    $route['admin_prefix'] = '\\';
+                    $route['admin_prefix'] .= '\\';
                 }
-                debug($route);
+
                 $route['controller'] = self::upperCamelCase($route['controller']);
-                debug($route);
+                self::$route = $route;
 
                 return true;
             }
@@ -61,6 +87,6 @@ class Router
     }
     protected static function lowerCamelCase($name): string
     {
-        return lcfirst(self::lowerCamelCase($name));
+        return lcfirst(self::upperCamelCase($name));
     }
 }
